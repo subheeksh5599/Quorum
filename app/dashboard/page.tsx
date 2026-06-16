@@ -69,7 +69,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (result?.consensus.status === "approved" && isConnected) {
+    if (result && result.consensus && result.consensus.status === "approved" && isConnected) {
       const addr = result.transaction.counterparty || "0x0000000000000000000000000000000000000000";
       estimateGas(addr, "0").then(setGas).catch(() => setGas(null));
     } else {
@@ -93,6 +93,11 @@ export default function Dashboard() {
         body: JSON.stringify(newCase),
       });
       const data = await res.json();
+      if (!res.ok || data.error) {
+        setTxError(data.error || "Submission failed");
+        setSubmitting(false);
+        return;
+      }
       setResult(data);
       const refresh = await fetch("/api/transactions").then((r) => r.json());
       setStats(refresh.stats);
@@ -104,7 +109,7 @@ export default function Dashboard() {
   }
 
   async function handleExecute() {
-    if (!result || !isConnected) return;
+    if (!result || !result.consensus || !isConnected) return;
     setExecuting(true);
     setTxError(null);
     setReceipt(null);
