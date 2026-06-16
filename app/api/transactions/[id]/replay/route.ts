@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProvider } from "@/lib/data";
-import { getReplay } from "@/lib/audit/replay";
+import { buildReplay } from "@/lib/audit/replay";
 
 export async function GET(
   _req: NextRequest,
@@ -13,6 +13,7 @@ export async function GET(
     return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
   }
 
-  const frames = getReplay(tx);
+  const entries = await provider.getAuditLog(id);
+  const frames = buildReplay(tx, entries);
   return NextResponse.json({ caseNumber: tx.caseNumber, frames });
 }

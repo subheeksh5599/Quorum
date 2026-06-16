@@ -1,5 +1,4 @@
 import type { AuditEntry, Transaction } from "@/lib/types";
-import { getAuditLog } from "@/lib/store";
 
 export interface ReplayFrame {
   timestamp: number;
@@ -11,13 +10,17 @@ export interface ReplayFrame {
   confidence?: number;
 }
 
-export function getReplay(tx: Transaction): ReplayFrame[] {
-  const log = getAuditLog(tx.id);
-  if (log.length === 0) return [];
+export function buildReplay(tx: Transaction, entries: AuditEntry[]): ReplayFrame[] {
+  if (entries.length === 0) {
+    return [{
+      timestamp: tx.createdAt,
+      phase: "created",
+      label: "Case Opened",
+      details: `Case ${tx.caseNumber} opened — ${tx.purpose.replace(/_/g, " ")}`,
+    }];
+  }
 
-  const startTime = tx.createdAt;
-
-  return log.map((entry) => ({
+  return entries.map((entry) => ({
     timestamp: entry.timestamp,
     phase: entry.phase,
     label: phaseLabel(entry.phase),
