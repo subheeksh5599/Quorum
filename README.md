@@ -2,6 +2,7 @@
 
 **Adversarial AI Consensus Protocol for Institutional Finance**
 
+[![Deployed on Vercel](https://img.shields.io/badge/Vercel-Deployed-black?logo=vercel)](https://quorum-consensus.vercel.app)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Ethers](https://img.shields.io/badge/Ethers-v6-purple?logo=ethereum)](https://ethers.org/)
