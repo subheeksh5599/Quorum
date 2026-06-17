@@ -9,29 +9,20 @@ import type {
 } from "../types";
 import { isConfigured, queryTxs } from "../cleanverse/client";
 
-/**
- * Cleanverse data provider.
- *
- * When CLEANVERSE_API_ID + CLEANVERSE_API_KEY are set,
- * transactions/votes/audit/disputes are persisted to Cleanverse.
- *
- * Currently stubbed — fill in the real API calls when your
- * Cleanverse endpoint is ready.
- */
+const _txCache = new Map<string, Transaction>();
+const _voteCache = new Map<string, AgentVote[]>();
+const _auditCache: AuditEntry[] = [];
+const _disputeCache: Dispute[] = [];
+let _precedentCache: PrecedentCase[] = [];
+let _caseNum = 0;
+
 export const cleanverseProvider: DataProvider = {
   createTransaction(input: CreateTxInput): Transaction {
-    if (!isConfigured()) {
-      throw new Error("Cleanverse API not configured");
-    }
-
-    // TODO: POST /transactions to Cleanverse
-    // const result = await postEncrypted("/transactions/create", input);
-    // return mapToTransaction(result.data);
-
+    _caseNum++;
     const id = `cv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    return {
+    const tx: Transaction = {
       id,
-      caseNumber: `CV-2026-${String(Date.now() % 1000).padStart(3, "0")}`,
+      caseNumber: `CV-2026-${String(_caseNum).padStart(3, "0")}`,
       amount: input.amount,
       currency: input.currency,
       country: input.country,
@@ -42,17 +33,26 @@ export const cleanverseProvider: DataProvider = {
       status: "voting",
       createdAt: Date.now(),
     };
+
+    _txCache.set(id, tx);
+    return tx;
   },
 
   async getTransaction(id: string) {
+    const cached = _txCache.get(id);
+    if (cached) return cached;
+
     if (!isConfigured()) return null;
-    // TODO: GET /transactions/:id from Cleanverse
+    // TODO: GET from Cleanverse when API supports it
     return null;
   },
 
   async getAllTransactions() {
+    const cached = Array.from(_txCache.values()).sort((a, b) => b.createdAt - a.createdAt);
+    if (cached.length > 0) return cached;
+
     if (!isConfigured()) return [];
-    // TODO: GET /transactions from Cleanverse
+    // TODO: GET from Cleanverse
     return [];
   },
 
@@ -61,105 +61,90 @@ export const cleanverseProvider: DataProvider = {
     status: CaseStatus,
     updates?: Partial<Transaction>
   ) {
-    if (!isConfigured()) return null;
-    // TODO: PATCH /transactions/:id on Cleanverse
+    const tx = _txCache.get(id);
+    if (tx) {
+      const updated = { ...tx, status, ...updates };
+      _txCache.set(id, updated);
+      return updated;
+    }
     return null;
   },
 
   async saveVotes(txId: string, votes: AgentVote[]) {
-    if (!isConfigured()) return;
-    // TODO: POST /transactions/:id/votes on Cleanverse
+    _voteCache.set(txId, votes);
   },
 
   async getVotes(txId: string) {
-    if (!isConfigured()) return [];
-    // TODO: GET /transactions/:id/votes from Cleanverse
-    return [];
+    return _voteCache.get(txId) || [];
   },
 
   async appendAudit(entry: AuditEntry) {
-    if (!isConfigured()) return;
-    // TODO: POST /audit on Cleanverse
+    _auditCache.push(entry);
   },
 
   async getAuditLog(txId: string) {
-    if (!isConfigured()) return [];
-    // TODO: GET /audit?txId=:id from Cleanverse
-    return [];
+    return _auditCache.filter((e) => e.transactionId === txId);
   },
 
   async getAllAuditLog() {
-    if (!isConfigured()) return [];
-    // TODO: GET /audit from Cleanverse
-    return [];
+    return _auditCache;
   },
 
   async saveDispute(dispute: Dispute) {
-    if (!isConfigured()) return;
-    // TODO: POST /disputes on Cleanverse
+    _disputeCache.push(dispute);
   },
 
   async getDisputes() {
-    if (!isConfigured()) return [];
-    // TODO: GET /disputes from Cleanverse
-    return [];
+    return _disputeCache.sort((a, b) => {
+      const ta = a.resolvedAt || 0;
+      const tb = b.resolvedAt || 0;
+      return tb - ta;
+    });
   },
 
   async getDispute(txId: string) {
-    if (!isConfigured()) return null;
-    // TODO: GET /disputes/:txId from Cleanverse
-    return null;
+    return _disputeCache.find((d) => d.transactionId === txId) || null;
   },
 
   async resolveDispute(txId: string, resolvedAt: number) {
-    if (!isConfigured()) return null;
-    // TODO: PATCH /disputes/:txId on Cleanverse
-    return null;
+    const d = _disputeCache.find((dp) => dp.transactionId === txId);
+    if (d) d.resolvedAt = resolvedAt;
+    return d || null;
   },
 
   async loadPrecedents(cases: PrecedentCase[]) {
-    if (!isConfigured()) return;
-    // TODO: Seed precedents on Cleanverse
+    _precedentCache = cases;
   },
 
   async getPrecedents() {
-    if (!isConfigured()) return [];
-    // TODO: GET /precedents from Cleanverse
-    return [];
+    return _precedentCache;
   },
 
   async addPrecedent(c: PrecedentCase) {
-    if (!isConfigured()) return;
-    // TODO: POST /precedents on Cleanverse
+    _precedentCache.push(c);
   },
 
   async getStats() {
-    if (!isConfigured()) {
-      return {
-        totalCases: 0,
-        approved: 0,
-        blocked: 0,
-        disputed: 0,
-        totalValue: 0,
-        consensusRate: 0,
-        activeAgents: 6,
-        precedentCount: 0,
-      };
-    }
-    // TODO: GET /stats from Cleanverse
+    const allTxs = Array.from(_txCache.values());
+    const approved = allTxs.filter((t) => t.status === "approved").length;
+    const blocked = allTxs.filter((t) => t.status === "blocked").length;
+    const disputedTxs = allTxs.filter((t) => t.status === "disputed" || t.status === "under_review").length;
+    const totalValue = allTxs.reduce((sum, t) => sum + t.amount, 0);
+
     return {
-      totalCases: 0,
-      approved: 0,
-      blocked: 0,
-      disputed: 0,
-      totalValue: 0,
-      consensusRate: 0,
+      totalCases: allTxs.length,
+      approved,
+      blocked,
+      disputed: disputedTxs,
+      totalValue,
+      consensusRate: allTxs.length > 0 ? Math.round(((approved + blocked) / allTxs.length) * 100) : 0,
       activeAgents: 6,
-      precedentCount: 0,
+      precedentCount: _precedentCache.length,
     };
   },
 
   nextCaseNumber() {
-    return `CV-2026-${String(Date.now() % 1000).padStart(3, "0")}`;
+    _caseNum++;
+    return `CV-2026-${String(_caseNum).padStart(3, "0")}`;
   },
 };

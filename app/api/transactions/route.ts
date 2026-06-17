@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      transaction: await provider.getTransaction(tx.id),
+      transaction: tx,
       consensus: result,
     });
   } catch (err) {

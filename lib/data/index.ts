@@ -17,6 +17,11 @@ export function getProvider(): DataProvider {
 
   if (useCleanverse) {
     console.log("[Quorum] Using Cleanverse data provider");
+    if (!_seeded && seedPrecedents.length > 0) {
+      _provider.loadPrecedents(seedPrecedents);
+      _seeded = true;
+      console.log(`[Quorum] Seeded ${seedPrecedents.length} precedent cases`);
+    }
   } else {
     console.log("[Quorum] Using in-memory data provider");
     if (!_seeded && seedPrecedents.length > 0) {
